@@ -187,3 +187,4 @@ azure-pipelines.yml
 !package*.json
 !host.json
 !requirements.txt
+resources/function-app-deploy-log.txt

@@ -2,12 +2,26 @@ import azure.functions as func
 import logging
 import json
 import os
+import sys
 from datetime import datetime
 from typing import Dict, List, Optional, Any
-from pydantic import BaseModel, ValidationError, Field
-from arcgis.gis import GIS
-from arcgis.features import FeatureLayer
-from config import ArcGISConfig
+
+# Try to import optional dependencies
+try:
+    from pydantic import BaseModel, ValidationError, Field
+    PYDANTIC_AVAILABLE = True
+except ImportError:
+    PYDANTIC_AVAILABLE = False
+    logging.warning("Pydantic not available, sensor data validation will be limited")
+
+try:
+    from arcgis.gis import GIS
+    from arcgis.features import FeatureLayer
+    from config import ArcGISConfig
+    ARCGIS_AVAILABLE = True
+except ImportError as e:
+    ARCGIS_AVAILABLE = False
+    logging.warning(f"ArcGIS not available: {e}")
 
 app = func.FunctionApp()
 
@@ -415,4 +429,23 @@ def hello(req: func.HttpRequest) -> func.HttpResponse:
     return func.HttpResponse(
         response_text,
         status_code=200
+    )
+
+@app.route(route="status", auth_level=func.AuthLevel.ANONYMOUS)
+def status(req: func.HttpRequest) -> func.HttpResponse:
+    """Simple status endpoint to test function registration"""
+    logging.info('Status endpoint requested')
+    
+    status_data = {
+        "status": "running",
+        "timestamp": datetime.utcnow().isoformat(),
+        "python_version": sys.version,
+        "arcgis_available": ARCGIS_AVAILABLE,
+        "pydantic_available": PYDANTIC_AVAILABLE
+    }
+    
+    return func.HttpResponse(
+        json.dumps(status_data),
+        status_code=200,
+        mimetype="application/json"
     )
