@@ -36,6 +36,9 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
           enable-AzPSSession: false
           allow-no-subscriptions: false
+        env:
+          AZURE_CORE_SURVEY_DISABLE: true
+          AZURE_CORE_COLLECT_TELEMETRY: false
 
       - name: Create Resource Group
         run: |
@@ -71,6 +74,9 @@ jobs:
               --name arcgis-infrastructure-deployment \
               --mode Incremental \
               --verbose
+        env:
+          AZURE_CORE_SURVEY_DISABLE: true
+          AZURE_CORE_COLLECT_TELEMETRY: false
 
       - name: Get Deployment Outputs
         id: get-outputs
