@@ -1,0 +1,68 @@
+name: Deploy ArcGIS Function App
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths: [ 'src/**' ]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-function-app:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r src/requirements.txt
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          enable-AzPSSession: false
+          allow-no-subscriptions: false
+
+      - name: Deploy ArcGIS Function App
+        uses: Azure/functions-action@v1
+        with:
+          app-name: 'simple-func-iac-arcgis-ba'
+          slot-name: 'production'
+          package: './src'
+          scm-do-build-during-deployment: true
+          enable-oryx-build: true
+
+      - name: Test ArcGIS Endpoints
+        run: |
+          echo "=== Testing ArcGIS Function App Endpoints ==="
+          sleep 60  # Wait for deployment to complete
+          
+          # Test health endpoint
+          echo "Testing health endpoint..."
+          curl -f "https://simple-func-iac-arcgis-ba.azurewebsites.net/api/health" || echo "Health endpoint failed"
+          
+          # Test legacy endpoints
+          echo "Testing legacy test endpoint..."
+          curl -f "https://simple-func-iac-arcgis-ba.azurewebsites.net/api/test" || echo "Test endpoint failed"
+          
+          echo "Testing legacy hello endpoint..."
+          curl -f "https://simple-func-iac-arcgis-ba.azurewebsites.net/api/hello?name=ArcGIS" || echo "Hello endpoint failed"
+          
+          # Test ArcGIS endpoints
+          echo "Testing features list endpoint..."
+          curl -f "https://simple-func-iac-arcgis-ba.azurewebsites.net/api/features" || echo "Features endpoint failed"
+          
+          echo "=== ArcGIS Function App Deployment Complete ==="
+          echo "🔗 Function App URL: https://simple-func-iac-arcgis-ba.azurewebsites.net"
+          echo "🔗 Health Check: https://simple-func-iac-arcgis-ba.azurewebsites.net/api/health"
+          echo "🔗 Sensor Data Endpoint: https://simple-func-iac-arcgis-ba.azurewebsites.net/api/sensor-data"

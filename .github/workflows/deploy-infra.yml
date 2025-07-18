@@ -1,0 +1,115 @@
+name: Deploy ArcGIS Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      arcgis_username:
+        description: 'ArcGIS Online Username'
+        required: true
+      arcgis_password:
+        description: 'ArcGIS Online Password'
+        required: true
+      feature_service_id:
+        description: 'Feature Service ID'
+        required: true
+      feature_layer_index:
+        description: 'Feature Layer Index'
+        required: false
+        default: '0'
+  push:
+    branches: [ main ]
+    paths: [ 'infra/**' ]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          enable-AzPSSession: false
+          allow-no-subscriptions: false
+
+      - name: Create Resource Group
+        run: |
+          az group create \
+            --name rg-simple-func-iac-arcgis \
+            --location westeurope \
+            --output none
+
+      - name: Test Azure CLI Connection
+        run: |
+          az account show --output table
+          az group list --output table
+
+      - name: Deploy ArcGIS Infrastructure with Azure CLI
+        uses: azure/cli@v2
+        with:
+          azcliversion: 2.72.0
+          inlineScript: |
+            echo "=== Starting ArcGIS infrastructure deployment ==="
+            az deployment group create \
+              --resource-group rg-simple-func-iac-arcgis \
+              --template-file infra/main.bicep \
+              --parameters \
+                functionAppName='simple-func-iac-arcgis-ba' \
+                storageAccountName='sfiacarcgis' \
+                appInsightsName='simple-func-iac-arcgis-ba-insights' \
+                hostingPlanName='simple-func-iac-arcgis-ba-plan' \
+                arcgisUrl='https://www.arcgis.com' \
+                arcgisUsername='${{ github.event.inputs.arcgis_username || secrets.ARCGIS_USERNAME }}' \
+                arcgisPassword='${{ github.event.inputs.arcgis_password || secrets.ARCGIS_PASSWORD }}' \
+                featureServiceId='${{ github.event.inputs.feature_service_id || secrets.FEATURE_SERVICE_ID }}' \
+                featureLayerIndex='${{ github.event.inputs.feature_layer_index || secrets.FEATURE_LAYER_INDEX || '0' }}' \
+              --name arcgis-infrastructure-deployment \
+              --mode Incremental \
+              --verbose
+
+      - name: Get Deployment Outputs
+        id: get-outputs
+        run: |
+          FUNCTION_APP_NAME=$(az deployment group show \
+            --resource-group rg-simple-func-iac-arcgis \
+            --name arcgis-infrastructure-deployment \
+            --query properties.outputs.functionAppName.value \
+            --output tsv)
+          echo "function-app-name=$FUNCTION_APP_NAME" >> $GITHUB_OUTPUT
+
+      - name: Show Deployment Results
+        run: |
+          echo "=== ArcGIS Infrastructure Deployment Completed Successfully ==="
+          FUNCTION_APP_NAME=$(az deployment group show \
+            --resource-group rg-simple-func-iac-arcgis \
+            --name arcgis-infrastructure-deployment \
+            --query properties.outputs.functionAppName.value \
+            --output tsv)
+          FUNCTION_APP_URL=$(az deployment group show \
+            --resource-group rg-simple-func-iac-arcgis \
+            --name arcgis-infrastructure-deployment \
+            --query properties.outputs.functionAppUrl.value \
+            --output tsv)
+          STORAGE_ACCOUNT_NAME=$(az deployment group show \
+            --resource-group rg-simple-func-iac-arcgis \
+            --name arcgis-infrastructure-deployment \
+            --query properties.outputs.storageAccountName.value \
+            --output tsv)
+          APP_INSIGHTS_NAME=$(az deployment group show \
+            --resource-group rg-simple-func-iac-arcgis \
+            --name arcgis-infrastructure-deployment \
+            --query properties.outputs.appInsightsName.value \
+            --output tsv)
+          
+          echo "Function App Name: $FUNCTION_APP_NAME"
+          echo "Function App URL: $FUNCTION_APP_URL"
+          echo "Storage Account: $STORAGE_ACCOUNT_NAME"
+          echo "App Insights: $APP_INSIGHTS_NAME"
+          echo "=== Next Steps ==="
+          echo "1. Run the 'Deploy ArcGIS Function App' workflow to deploy the function code"
+          echo "2. Test the ArcGIS endpoints after deployment"
