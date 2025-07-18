@@ -2,20 +2,6 @@ name: Deploy ArcGIS Infrastructure
 
 on:
   workflow_dispatch:
-    inputs:
-      arcgis_username:
-        description: 'ArcGIS Online Username'
-        required: true
-      arcgis_password:
-        description: 'ArcGIS Online Password'
-        required: true
-      feature_service_id:
-        description: 'Feature Service ID'
-        required: true
-      feature_layer_index:
-        description: 'Feature Layer Index'
-        required: false
-        default: '0'
   push:
     branches: [ main ]
     paths: [ 'infra/**' ]
@@ -67,10 +53,10 @@ jobs:
                 appInsightsName='simple-func-iac-arcgis-ba-insights' \
                 hostingPlanName='simple-func-iac-arcgis-ba-plan' \
                 arcgisUrl='https://www.arcgis.com' \
-                arcgisUsername='${{ github.event.inputs.arcgis_username || secrets.ARCGIS_USERNAME }}' \
-                arcgisPassword='${{ github.event.inputs.arcgis_password || secrets.ARCGIS_PASSWORD }}' \
-                featureServiceId='${{ github.event.inputs.feature_service_id || secrets.FEATURE_SERVICE_ID }}' \
-                featureLayerIndex='${{ github.event.inputs.feature_layer_index || secrets.FEATURE_LAYER_INDEX || '0' }}' \
+                arcgisUsername='${{ secrets.ARCGIS_USERNAME }}' \
+                arcgisPassword='${{ secrets.ARCGIS_PASSWORD }}' \
+                featureServiceId='${{ secrets.FEATURE_SERVICE_ID }}' \
+                featureLayerIndex='${{ secrets.FEATURE_LAYER_INDEX }}' \
               --name arcgis-infrastructure-deployment \
               --mode Incremental \
               --verbose
