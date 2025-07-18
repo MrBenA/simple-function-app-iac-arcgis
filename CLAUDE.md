@@ -793,21 +793,60 @@ This ArcGIS integration iteration is considered successful when:
 
 ---
 
-**Last Updated**: 2024-01-15
-**Status**: 📋 **READY FOR IMPLEMENTATION**
+**Last Updated**: 2025-07-18
+**Status**: 🔄 **DEPLOYMENT ISSUE RESOLVED - IMPLEMENTING INCREMENTAL APPROACH**
+
+## Current Development Status (2025-07-18)
+
+### Issue Identified and Resolved
+During initial deployment attempts, the function app was successfully deployed but **NO FUNCTIONS WERE BEING REGISTERED**. All endpoints returned 404 errors.
+
+**Root Cause**: Complex ArcGIS dependencies (pydantic, arcgis, config imports) were causing import failures during function registration, preventing Azure Functions from discovering and registering the function endpoints.
+
+### Solution Implemented
+**Incremental Development Strategy**: Start with working minimal version, then add complexity step by step.
+
+#### Step 1: Minimal Working Version (CURRENT)
+- **Status**: ✅ **IMPLEMENTED** - Ready for deployment test
+- **Approach**: Simplified function_app.py based on successful `simple-function-app-iac` iteration
+- **Changes Made**:
+  - Removed all complex imports (pydantic, arcgis, config)
+  - Simplified requirements.txt to only `azure-functions>=1.11.0`
+  - Reduced timeout from 10 minutes to 5 minutes
+  - Kept same infrastructure and deployment workflows
+
+#### Step 2: Incremental ArcGIS Integration (PLANNED)
+Once Step 1 is confirmed working:
+1. **Add basic ArcGIS import** - Test function registration with arcgis import
+2. **Add Pydantic validation** - Test with data validation
+3. **Add configuration management** - Test with environment variables
+4. **Add ArcGIS connectivity** - Test connection to ArcGIS Online
+5. **Add sensor data endpoints** - Full functionality
+
+### Key Lessons Learned
+1. **Function Registration Failure**: Heavy dependencies can prevent function discovery
+2. **Import Errors**: Silent failures during import cause 404 errors on all endpoints
+3. **Incremental Development**: Start simple, add complexity gradually
+4. **Comparison Testing**: Use working versions as baseline for troubleshooting
+
+### Next Immediate Steps
+1. **Test Minimal Version**: Deploy simplified function app and verify endpoints work
+2. **Validate Function Registration**: Confirm health, test, and hello endpoints return 200
+3. **Add ArcGIS Step by Step**: Once working, incrementally add ArcGIS functionality
+4. **Document Each Step**: Record what works and what breaks function registration
 
 **Critical Notes for Claude Code**:
-1. **ALWAYS use `arcgis==1.9.1`** in requirements.txt
-2. **ALWAYS use Python 3.9** runtime for Azure Functions
-3. **EXPECT longer deployment times** due to ArcGIS API
-4. **VALIDATE ArcGIS credentials** before deployment
-5. **TEST thoroughly** with sample sensor data
+1. **START SIMPLE**: Always begin with minimal working version
+2. **INCREMENTAL APPROACH**: Add one dependency at a time
+3. **TEST FUNCTION REGISTRATION**: Verify endpoints work before adding complexity
+4. **USE WORKING BASELINE**: Compare with successful simple-function-app-iac iteration
+5. **DOCUMENT FAILURES**: Record what breaks function registration
 
-**Next Steps**:
-1. Configure ArcGIS Online hosted feature service
-2. Set up Azure Function App with proper environment variables
-3. Deploy infrastructure using GitHub Actions
-4. Test sensor data ingestion and ArcGIS integration
-5. Validate all endpoints and error handling
+**Current Next Steps**:
+1. ✅ Implement minimal working version (COMPLETED)
+2. 🔄 Test deployment of minimal version (IN PROGRESS)
+3. 📋 Verify all endpoints return 200 responses
+4. 📋 Add ArcGIS Python API incrementally
+5. 📋 Test function registration after each addition
 
-This iteration demonstrates practical ArcGIS integration with Azure Functions, providing a foundation for sensor data processing and storage in geospatial platforms.
+**Target Architecture**: Once working, this will demonstrate practical ArcGIS integration with Azure Functions, providing a foundation for sensor data processing and storage in geospatial platforms.
