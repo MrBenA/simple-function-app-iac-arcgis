@@ -828,6 +828,44 @@ Once Step 1 is confirmed working:
 2. **Import Errors**: Silent failures during import cause 404 errors on all endpoints
 3. **Incremental Development**: Start simple, add complexity gradually
 4. **Comparison Testing**: Use working versions as baseline for troubleshooting
+5. **ArcGIS Python API System Dependencies**: The ArcGIS Python API requires system-level Kerberos libraries to compile successfully in containerized environments
+
+### Critical Discovery: ArcGIS Python API System Dependencies
+During troubleshooting, we discovered that the ArcGIS Python API has a dependency on `gssapi` which requires system-level Kerberos libraries. This is a very common issue in containerized environments.
+
+**Error Symptoms**:
+```
+Collecting gssapi (from requests-gssapi)
+/bin/sh: 1: krb5-config: not found
+subprocess.CalledProcessError: Command 'krb5-config --libs gssapi' returned non-zero exit status 127
+```
+
+**Solution - System Dependencies Required**:
+The GitHub Actions workflow was updated to install system dependencies before pip install:
+
+```yaml
+- name: Install system dependencies for ArcGIS
+  run: |
+    sudo apt-get update
+    sudo apt-get install -y libkrb5-dev libgssapi-krb5-2 krb5-config
+```
+
+**Required System Libraries**:
+- `libkrb5-dev` - Kerberos development libraries
+- `libgssapi-krb5-2` - GSSAPI Kerberos libraries  
+- `krb5-config` - Kerberos configuration tool
+
+**Impact**: This resolved the ArcGIS Python API compilation errors, but function registration issues remained due to import complexity.
+
+**Deployment Success Evidence**: 
+The file `resources/function-app-deploy-log.txt` contains the complete deployment log showing:
+- ✅ System dependencies installed successfully
+- ✅ ArcGIS Python API compiled and installed without errors
+- ✅ Function app deployed successfully to Azure
+- ✅ Package uploaded and extracted correctly
+- ❌ Functions not registered (404 errors on all endpoints)
+
+This proves the system dependency solution worked for compilation, but the function registration issue was a separate problem caused by complex imports preventing Azure Functions from discovering the function endpoints.
 
 ### Next Immediate Steps
 1. **Test Minimal Version**: Deploy simplified function app and verify endpoints work
