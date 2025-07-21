@@ -13,6 +13,12 @@ except ImportError as e:
     REQUESTS_AVAILABLE = False
     logging.error(f"Requests import failed: {e}")
 
+# Always available - Python built-in
+import urllib.request
+import urllib.parse
+from urllib.error import URLError
+URLLIB_AVAILABLE = True
+
 app = func.FunctionApp()
 
 @app.route(route="health", auth_level=func.AuthLevel.ANONYMOUS)
@@ -23,9 +29,10 @@ def health(req: func.HttpRequest) -> func.HttpResponse:
     health_data = {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "2.0.0-python-3.11-requests",
+        "version": "2.0.0-python-3.11-urllib",
         "python_version": "3.11",
-        "requests_available": REQUESTS_AVAILABLE
+        "requests_available": REQUESTS_AVAILABLE,
+        "urllib_available": URLLIB_AVAILABLE
     }
     
     return func.HttpResponse(
@@ -107,6 +114,58 @@ def requests_test(req: func.HttpRequest) -> func.HttpResponse:
     
     except Exception as e:
         logging.error(f"Requests test failed: {str(e)}")
+        return func.HttpResponse(
+            json.dumps({
+                "status": "failed",
+                "error": str(e),
+                "timestamp": datetime.utcnow().isoformat()
+            }),
+            status_code=500,
+            mimetype="application/json"
+        )
+
+@app.route(route="urllib-test", auth_level=func.AuthLevel.ANONYMOUS)
+def urllib_test(req: func.HttpRequest) -> func.HttpResponse:
+    """Test urllib (built-in) with simple HTTP call"""
+    logging.info('urllib test requested')
+    
+    try:
+        # Simple HTTP test using urllib
+        with urllib.request.urlopen('https://httpbin.org/json', timeout=10) as response:
+            if response.status == 200:
+                content = response.read()
+                test_data = json.loads(content.decode('utf-8'))
+                
+                return func.HttpResponse(
+                    json.dumps({
+                        "status": "success",
+                        "message": "urllib (built-in) working perfectly",
+                        "test_url": "https://httpbin.org/json",
+                        "response_status": response.status,
+                        "response_data": test_data,
+                        "python_version": "3.11",
+                        "http_library": "urllib (built-in)",
+                        "timestamp": datetime.utcnow().isoformat()
+                    }),
+                    status_code=200,
+                    mimetype="application/json"
+                )
+            else:
+                raise Exception(f"HTTP {response.status}")
+                
+    except URLError as e:
+        logging.error(f"urllib test failed (URLError): {str(e)}")
+        return func.HttpResponse(
+            json.dumps({
+                "status": "failed",
+                "error": f"URLError: {str(e)}",
+                "timestamp": datetime.utcnow().isoformat()
+            }),
+            status_code=500,
+            mimetype="application/json"
+        )
+    except Exception as e:
+        logging.error(f"urllib test failed: {str(e)}")
         return func.HttpResponse(
             json.dumps({
                 "status": "failed",
