@@ -44,7 +44,8 @@ class ArcGISRestClient:
                 'password': self.password,
                 'client': 'requestip',
                 'f': 'json',
-                'expiration': 60  # 60 minutes
+                'expiration': 60,  # 60 minutes
+                'referer': 'https://www.arcgis.com'  # Add referer for feature service operations
             }
             
             # Encode data for POST request
@@ -143,16 +144,61 @@ class ArcGISFeatureService:
         self.client = rest_client
         self.service_id = service_id
         self.layer_index = layer_index
-        # For hosted services, URL uses service name, not service ID
-        # The service name is typically the same as specified when created
-        service_name = "SensorDataService"  # Service name from hosted table creation
-        self.service_url = f"https://services-eu1.arcgis.com/veDTgAL7B9EBogdG/arcgis/rest/services/{service_name}/FeatureServer"
-        self.layer_url = f"{self.service_url}/{layer_index}"
+        # For hosted services, we'll use dynamic service URL discovery
+        # This will be set when we first access the service
+        self.service_url = None
+        self.layer_url = None
+        self.layer_index = layer_index
+    
+    def _get_service_url(self):
+        """Dynamically discover the correct service URL from the service item"""
+        if self.service_url is None:
+            try:
+                # Get service item details using the service ID
+                token = self.client.get_token()
+                item_url = f"{self.client.org_url}/sharing/rest/content/items/{self.service_id}"
+                params = {
+                    'token': token,
+                    'f': 'json'
+                }
+                
+                query_string = urllib.parse.urlencode(params)
+                full_url = f"{item_url}?{query_string}"
+                
+                request = urllib.request.Request(
+                    full_url,
+                    headers={'User-Agent': 'Azure-Functions-ArcGIS-Client/1.0'}
+                )
+                
+                with urllib.request.urlopen(request, timeout=10) as response:
+                    if response.status == 200:
+                        content = response.read()
+                        result = json.loads(content.decode('utf-8'))
+                        
+                        if 'url' in result:
+                            self.service_url = result['url']
+                            self.layer_url = f"{self.service_url}/{self.layer_index}"
+                            logging.info(f"Discovered service URL: {self.service_url}")
+                            return
+                
+                # Fallback to constructed URL if discovery fails
+                raise Exception("Could not discover service URL")
+                
+            except Exception as e:
+                logging.warning(f"Service URL discovery failed: {str(e)}, using fallback")
+                # Fallback to hardcoded service name
+                service_name = "SensorDataService"
+                self.service_url = f"https://services-eu1.arcgis.com/veDTgAL7B9EBogdG/arcgis/rest/services/{service_name}/FeatureServer"
+                self.layer_url = f"{self.service_url}/{self.layer_index}"
+        
+        return self.layer_url
     
     def add_features(self, features):
         """Add new historical features to the service"""
         try:
-            url = f"{self.layer_url}/addFeatures"
+            # Ensure service URL is discovered
+            layer_url = self._get_service_url()
+            url = f"{layer_url}/addFeatures"
             
             # Convert features to ArcGIS format
             arcgis_features = []
@@ -171,6 +217,10 @@ class ArcGISFeatureService:
             token = self.client.get_token()
             data['token'] = token
             data['f'] = 'json'
+            
+            # Debug logging
+            logging.info(f"Using token for feature service operation: {token[:20]}...")
+            logging.info(f"Feature service URL: {url}")
             
             # Encode data for POST request
             data_encoded = urllib.parse.urlencode(data).encode('utf-8')
@@ -219,7 +269,9 @@ class ArcGISFeatureService:
     def query_features(self, where_clause="1=1", return_fields="*", max_records=1000, order_by=None):
         """Query features from the service"""
         try:
-            url = f"{self.layer_url}/query"
+            # Ensure service URL is discovered
+            layer_url = self._get_service_url()
+            url = f"{layer_url}/query"
             
             # Prepare query parameters
             params = {
