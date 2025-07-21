@@ -14,22 +14,22 @@ from datetime import datetime
 BASE_URL = "https://simple-func-iac-arcgis-ba.azurewebsites.net/api"  # Production
 
 # Test data - minimal required fields
-minimal_sensor_data = {
-    "asset_id": "test-asset-001",
-    "present_value": 5.5,
-    "alarm_date": "2024-01-15T10:30:00.000Z",
-    "device_type": "test sensor"
-}
+#minimal_sensor_data = {
+#    "asset_id": "test-asset-001",
+#    "present_value": 5.5,
+#    "alarm_date": "2024-01-15T10:30:00.000Z",
+#    "device_type": "test sensor"
+#}
 
 # Test data - complete sensor data
 complete_sensor_data = {
     "location": "test-location",
     "node_id": "test-node",
-    "block": "test-blk-001",
-    "level": 2,
+    "block": "test-blk-003",
+    "level": 1,
     "ward": "test-ward",
     "asset_type": "plank",
-    "asset_id": "blk-001-208",
+    "asset_id": "blk-003-007",
     "alarm_code": 3,
     "object_name": "early_deflection_alert",
     "description": "Early deflection alert",
@@ -138,14 +138,14 @@ def main():
     test_health_check()
     
     # Test 2: Minimal sensor data
-    objectid1 = test_sensor_data_post(minimal_sensor_data, "Minimal Required Fields")
+    #objectid1 = test_sensor_data_post(minimal_sensor_data, "Minimal Required Fields")
     
     # Test 3: Complete sensor data
     objectid2 = test_sensor_data_post(complete_sensor_data, "Complete Sensor Data")
     
     # Test 4: Query the data we just posted
-    if objectid1:
-        test_feature_query(minimal_sensor_data['asset_id'])
+    #if objectid1:
+    #    test_feature_query(minimal_sensor_data['asset_id'])
     
     if objectid2:
         test_feature_query(complete_sensor_data['asset_id'])

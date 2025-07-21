@@ -270,9 +270,9 @@ az deployment group create \
 
 **Endpoint**: `POST /api/sensor-data`
 
-**Description**: Creates a new historical record for sensor data. Each POST creates a new record - no updates to existing data.
+**Description**: Creates a new historical record for sensor data. Each POST creates a new record - no updates to existing data. All sensor fields are required as they map directly to the ArcGIS table schema.
 
-**Request Body (Complete Sensor Data)**:
+**Request Body (All Fields Required)**:
 ```json
 {
   "location": "test-location",
@@ -1133,17 +1133,17 @@ This proves the system dependency solution worked for compilation, but the funct
 
 **What Was Accomplished:**
 
-1. **ArcGISFeatureService Class**: Complete feature service operations using urllib for HTTP requests
+1. **ArcGISFeatureService Class**: Simplified feature service operations using urllib for HTTP requests
    - `add_features()` method for creating new historical records
    - `query_features()` method with filtering and ordering capabilities
    - `_convert_to_arcgis_attributes()` for field mapping and data transformation
-   - Comprehensive error handling and logging
+   - Direct service URL construction (no complex discovery logic)
 
-2. **SensorData Validation**: Robust data validation system
-   - Required fields validation (asset_id, present_value, alarm_date, device_type)
+2. **SensorData Validation**: Complete sensor data validation system
+   - All 20 sensor fields required (exact match to ArcGIS table schema)
    - Data type validation and meaningful error messages
    - ISO date format validation with fallback handling
-   - Complete sensor data model support
+   - Simplified validation approach
 
 3. **Historical Data Endpoints**: Four new REST API endpoints
    - `POST /api/sensor-data` - Creates new historical records (no updates)
@@ -1168,10 +1168,11 @@ This proves the system dependency solution worked for compilation, but the funct
 
 - **Zero External Dependencies**: Uses only Python built-in libraries (urllib, json, datetime)
 - **Historical Data Model**: Each POST creates new record, maintaining complete audit trail
+- **Simplified Architecture**: Direct service URL construction, no complex discovery logic
+- **Complete Data Validation**: All 20 sensor fields required, exact schema matching
 - **Production-Ready Error Handling**: Comprehensive error responses with meaningful messages
+- **Proven Authentication**: Fixed token generation using ArcGIS-compliant parameters
 - **Performance Optimized**: 30-second timeout for ArcGIS operations, efficient querying
-- **Security**: Token-based authentication with automatic refresh
-- **Scalability**: Pagination support, configurable limits, efficient ordering
 
 **Current Function Count**: 9 registered endpoints
 - health, test, hello, requests-test, urllib-test, arcgis-test, sensor-data, features/{asset_id}, features
