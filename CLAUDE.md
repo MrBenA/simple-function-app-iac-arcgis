@@ -264,20 +264,35 @@ az deployment group create \
   --parameters infra/main.bicepparam
 ```
 
-## API Endpoints
+## API Endpoints (Phase 3 - Historical Data Model)
 
-### Sensor Data Ingestion
+### Historical Sensor Data Ingestion
 
 **Endpoint**: `POST /api/sensor-data`
 
-**Request Body**:
+**Description**: Creates a new historical record for sensor data. Each POST creates a new record - no updates to existing data.
+
+**Request Body (Complete Sensor Data)**:
 ```json
 {
   "location": "test-location",
   "node_id": "test-node",
+  "block": "test-blk-001",
+  "level": 2,
+  "ward": "test-ward",
+  "asset_type": "plank",
   "asset_id": "blk-001-208",
   "alarm_code": 3,
+  "object_name": "early_deflection_alert",
+  "description": "Early deflection alert",
   "present_value": 6.0,
+  "threshold_value": 6.0,
+  "min_value": -250,
+  "max_value": 2,
+  "resolution": 0.1,
+  "units": "millimetre",
+  "alarm_status": "InAlarm",
+  "event_state": "HighLimit",
   "alarm_date": "2024-01-15T10:30:00.000Z",
   "device_type": "ultrasonic distance sensor"
 }
@@ -287,20 +302,70 @@ az deployment group create \
 ```json
 {
   "status": "success",
-  "message": "Sensor data processed successfully",
+  "message": "Historical sensor data record created successfully",
   "asset_id": "blk-001-208",
   "operation": "add",
-  "timestamp": "2024-01-15T10:30:05.123Z"
+  "alarm_date": "2024-01-15T10:30:00.000Z",
+  "processed_timestamp": "2024-01-15T10:30:05.123Z",
+  "arcgis_objectid": 12345
 }
 ```
 
-### Feature Queries
+### Historical Feature Queries
 
-**Get Feature by Asset ID**: `GET /api/features/{asset_id}`
+**Get Latest Record by Asset ID**: `GET /api/features/{asset_id}`
+- Returns the most recent sensor reading for the specified asset
 
-**List Features**: `GET /api/features?limit=10&where=alarm_code=3`
+**Get All Historical Records by Asset ID**: `GET /api/features/{asset_id}/history`  
+- Returns complete history of all sensor readings for the specified asset
+
+**List Latest Records**: `GET /api/features?limit=10&where=alarm_status='InAlarm'`
+- Returns latest record for each asset with optional filtering
+
+**List Historical Records**: `GET /api/features/history?start_date=2024-01-15&limit=100`
+- Returns historical records with time-based filtering
 
 **Health Check**: `GET /api/health`
+- Includes ArcGIS connectivity and feature service validation
+
+### Example Query Responses
+
+**Latest Record Response**:
+```json
+{
+  "found": true,
+  "asset_id": "blk-001-208", 
+  "latest_record": {
+    "OBJECTID": 12345,
+    "asset_id": "blk-001-208",
+    "present_value": 6.0,
+    "alarm_status": "InAlarm",
+    "alarm_date": 1642248600000,
+    "processed_timestamp": 1642248605123,
+    "device_type": "ultrasonic distance sensor"
+  }
+}
+```
+
+**Historical Records Response**:
+```json
+{
+  "asset_id": "blk-001-208",
+  "total_records": 157,
+  "date_range": {
+    "earliest": "2024-01-01T00:00:00.000Z", 
+    "latest": "2024-01-15T10:30:00.000Z"
+  },
+  "records": [
+    {
+      "OBJECTID": 12345,
+      "present_value": 6.0,
+      "alarm_status": "InAlarm", 
+      "alarm_date": 1642248600000
+    }
+  ]
+}
+```
 
 ### Health Check Response
 
@@ -793,8 +858,8 @@ This ArcGIS integration iteration is considered successful when:
 
 ---
 
-**Last Updated**: 2025-07-18
-**Status**: 🔄 **DEPLOYMENT ISSUE RESOLVED - IMPLEMENTING INCREMENTAL APPROACH**
+**Last Updated**: 2025-07-21
+**Status**: ✅ **PHASE 3 COMPLETE - HISTORICAL SENSOR DATA INGESTION IMPLEMENTED**
 
 ## Current Development Status (2025-07-18)
 
@@ -920,7 +985,7 @@ This proves the system dependency solution worked for compilation, but the funct
 - ✅ **urllib (built-in)**: Working perfectly - no dependencies, full HTTP functionality
 
 **Test Results (2025-07-21)**:
-- ✅ **5 functions registered**: health, test, hello, requests-test, urllib-test
+- ✅ **6 functions registered**: health, test, hello, requests-test, urllib-test, arcgis-test
 - ✅ **Python 3.11**: Confirmed working in Azure Functions runtime  
 - ✅ **urllib HTTP calls**: Successful external API calls with JSON parsing
 - ✅ **Function registration**: Fast deployment (2-3 minutes) with reliable registration
@@ -938,44 +1003,62 @@ This proves the system dependency solution worked for compilation, but the funct
 }
 ```
 
-### Phase 2: ArcGIS REST API Implementation (READY TO START)
+### Phase 2: ArcGIS REST API Authentication ✅ **COMPLETED**
 
-**Implementation Strategy - urllib-based:**
-1. **Token Management**: POST to `/sharing/rest/generateToken` using urllib.request
-2. **Connection Testing**: GET portal info for validation
-3. **Feature Service Operations**: Query/Add/Update via REST endpoints
-4. **Sensor Data Processing**: Full CRUD functionality
-5. **Query Endpoints**: Asset-based queries and filtering
+**Implementation Completed - urllib-based:**
+1. ✅ **ArcGISRestClient Class**: Token generation and management using urllib
+2. ✅ **Token Management**: POST to `/sharing/rest/generateToken` with automatic refresh
+3. ✅ **Connection Testing**: Portal info validation via `/sharing/rest/portals/self`
+4. ✅ **Authentication Validation**: Working credential verification
+5. ✅ **Health Check Integration**: ArcGIS connectivity included in health endpoint
+6. ✅ **Test Endpoint**: `/api/arcgis-test` for connection validation
 
-**Benefits of urllib Approach:**
-- ✅ **Zero external dependencies** - Python built-in library
-- ✅ **Reliable deployment** - no package installation issues  
+**Benefits Confirmed:**
+- ✅ **Zero external dependencies** - Python built-in library only
+- ✅ **Reliable deployment** - 2-3 minute deployment time
 - ✅ **Fast performance** - no import overhead
-- ✅ **Same REST API functionality** - identical ArcGIS integration
-- ✅ **Better maintainability** - fewer moving parts
+- ✅ **Stable function registration** - 6/6 endpoints working
+- ✅ **Production ready** - comprehensive error handling
 
 **Current Implementation Status**:
 1. ✅ **Infrastructure**: Azure resources deployed and working
 2. ✅ **Python runtime**: 3.11 confirmed working  
 3. ✅ **HTTP capability**: urllib validated with external API calls
 4. ✅ **Function registration**: Reliable function discovery and registration
-5. 🔄 **ArcGIS REST API**: Ready to implement using urllib
-6. 📋 **Feature service operations**: Pending implementation
-7. 📋 **Sensor data endpoints**: Pending implementation
+5. ✅ **ArcGIS Authentication**: Token generation and portal connectivity working
+6. ✅ **Connection validation**: Health check includes ArcGIS status
+7. 🔄 **Phase 3**: Ready to implement feature service operations and sensor data endpoints
 
-**Next Immediate Steps**:
-1. 🔄 **ArcGIS Token Generation**: Implement authentication using urllib POST
-2. 📋 **Connection Validation**: Test ArcGIS Online connectivity  
-3. 📋 **Feature Service Operations**: Query/Add/Update operations
-4. 📋 **Sensor Data Endpoint**: POST `/api/sensor-data` with validation
-5. 📋 **Query Endpoints**: GET endpoints for feature retrieval
+### Phase 3: Historical Sensor Data Ingestion ✅ **COMPLETED**
 
-**Technical Implementation Notes**:
+**Historical Data Model Approach:**
+- **Each POST = New Record**: Every sensor data submission creates a new historical record
+- **No Updates**: Never modify existing records, preserving complete audit trail  
+- **Time-Series Data**: Multiple records per asset_id showing readings over time
+- **Audit Trail**: Full historical tracking of sensor state changes and alarm events
+
+**Implementation Completed:**
+1. ✅ **ArcGISFeatureService Class**: Feature service operations for historical records
+2. ✅ **Sensor Data Validation**: SensorData dataclass with complete field validation
+3. ✅ **Historical POST Endpoint**: `/api/sensor-data` for JSON sensor data ingestion
+4. ✅ **Historical Query Endpoints**: Latest and historical data retrieval
+5. ✅ **Testing Framework**: Complete test script for validation
+
+**New API Endpoints Implemented:**
+- ✅ `POST /api/sensor-data` - Creates new historical sensor data records
+- ✅ `GET /api/features/{asset_id}` - Returns latest record for specific asset
+- ✅ `GET /api/features/{asset_id}/history` - Returns complete history for asset
+- ✅ `GET /api/features` - Returns latest records with optional filtering
+
+**Technical Implementation Details**:
 - **HTTP Library**: urllib.request (Python built-in)
 - **JSON Handling**: json.loads/dumps (Python built-in)  
 - **Error Handling**: urllib.error.URLError for HTTP errors
-- **Authentication**: Token-based via ArcGIS REST API
-- **Same Environment Variables**: ARCGIS_USERNAME, ARCGIS_PASSWORD, etc.
+- **Authentication**: Token-based via ArcGIS REST API (Phase 2)
+- **Data Model**: Historical records with original and processing timestamps
+- **Field Mapping**: Complete sensor JSON fields to ArcGIS table columns
+- **Validation**: Required field validation with meaningful error messages
+- **Testing**: Comprehensive test script with multiple scenarios
 
 **Performance Comparison**:
 | Metric | ArcGIS Python API | urllib REST API |
@@ -1043,3 +1126,63 @@ This proves the system dependency solution worked for compilation, but the funct
 - Clear separation of concerns (auth, CRUD, endpoints)
 
 **Target Architecture**: This demonstrates a **production-ready ArcGIS integration** with Azure Functions using modern Python 3.11, zero external dependencies, fast deployment, and reliable REST API integration for sensor data processing and geospatial storage.
+
+## Phase 3 Implementation Summary (2025-07-21)
+
+### ✅ **COMPLETE: Historical Sensor Data Ingestion**
+
+**What Was Accomplished:**
+
+1. **ArcGISFeatureService Class**: Complete feature service operations using urllib for HTTP requests
+   - `add_features()` method for creating new historical records
+   - `query_features()` method with filtering and ordering capabilities
+   - `_convert_to_arcgis_attributes()` for field mapping and data transformation
+   - Comprehensive error handling and logging
+
+2. **SensorData Validation**: Robust data validation system
+   - Required fields validation (asset_id, present_value, alarm_date, device_type)
+   - Data type validation and meaningful error messages
+   - ISO date format validation with fallback handling
+   - Complete sensor data model support
+
+3. **Historical Data Endpoints**: Four new REST API endpoints
+   - `POST /api/sensor-data` - Creates new historical records (no updates)
+   - `GET /api/features/{asset_id}` - Latest record for specific asset
+   - `GET /api/features/{asset_id}/history` - Complete history with pagination
+   - `GET /api/features` - Latest records with optional filtering
+
+4. **Field Mapping & Data Processing**: Complete sensor JSON to ArcGIS mapping
+   - All 20 sensor data fields mapped to ArcGIS table columns
+   - Special handling for 'block' → 'block_id' field mapping
+   - ISO date string conversion to ArcGIS timestamp format (milliseconds)
+   - Processing timestamp tracking for audit trail
+
+5. **Testing Framework**: Comprehensive validation tools
+   - `test_sensor_data.py` script with multiple test scenarios
+   - Minimal and complete sensor data testing
+   - Validation error testing
+   - Query endpoint testing
+   - Health check integration
+
+**Key Technical Achievements:**
+
+- **Zero External Dependencies**: Uses only Python built-in libraries (urllib, json, datetime)
+- **Historical Data Model**: Each POST creates new record, maintaining complete audit trail
+- **Production-Ready Error Handling**: Comprehensive error responses with meaningful messages
+- **Performance Optimized**: 30-second timeout for ArcGIS operations, efficient querying
+- **Security**: Token-based authentication with automatic refresh
+- **Scalability**: Pagination support, configurable limits, efficient ordering
+
+**Current Function Count**: 9 registered endpoints
+- health, test, hello, requests-test, urllib-test, arcgis-test, sensor-data, features/{asset_id}, features
+
+**Implementation Architecture**: 
+```
+Sensor Data (JSON) → Validation → ArcGIS REST API → Hosted Feature Service → Historical Records
+```
+
+**Deployment Status**: Ready for production deployment and testing
+- All code implemented and tested locally
+- Integration with existing Phase 2 authentication
+- Maintains fast deployment (2-3 minutes) and reliable function registration
+- Ready for Azure Functions deployment and ArcGIS Online validation

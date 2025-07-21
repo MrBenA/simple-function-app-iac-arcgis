@@ -136,8 +136,236 @@ class ArcGISRestClient:
                 'error': str(e)
             }
 
-# Global REST client instance
+class ArcGISFeatureService:
+    """ArcGIS Feature Service operations for historical sensor data"""
+    
+    def __init__(self, rest_client, service_id, layer_index=0):
+        self.client = rest_client
+        self.service_id = service_id
+        self.layer_index = layer_index
+        # Updated URL structure for hosted services
+        self.service_url = f"https://services-eu1.arcgis.com/veDTgAL7B9EBogdG/arcgis/rest/services/{service_id}/FeatureServer"
+        self.layer_url = f"{self.service_url}/{layer_index}"
+    
+    def add_features(self, features):
+        """Add new historical features to the service"""
+        try:
+            url = f"{self.layer_url}/addFeatures"
+            
+            # Convert features to ArcGIS format
+            arcgis_features = []
+            for feature in features:
+                arcgis_features.append({
+                    "attributes": self._convert_to_arcgis_attributes(feature)
+                })
+            
+            # Prepare POST data
+            data = {
+                'features': json.dumps(arcgis_features),
+                'rollbackOnFailure': 'true'
+            }
+            
+            # Get token and add to data
+            token = self.client.get_token()
+            data['token'] = token
+            data['f'] = 'json'
+            
+            # Encode data for POST request
+            data_encoded = urllib.parse.urlencode(data).encode('utf-8')
+            
+            # Create POST request
+            request = urllib.request.Request(
+                url,
+                data=data_encoded,
+                headers={
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'User-Agent': 'Azure-Functions-ArcGIS-Client/1.0'
+                }
+            )
+            
+            # Make the request
+            with urllib.request.urlopen(request, timeout=30) as response:
+                if response.status == 200:
+                    content = response.read()
+                    result = json.loads(content.decode('utf-8'))
+                    
+                    if 'error' in result:
+                        raise Exception(f"Add features failed: {result['error']}")
+                    
+                    if 'addResults' in result:
+                        success_count = len([r for r in result['addResults'] if r.get('success')])
+                        failed_count = len([r for r in result['addResults'] if not r.get('success')])
+                        
+                        return {
+                            'success': True,
+                            'added_count': success_count,
+                            'failed_count': failed_count,
+                            'results': result['addResults']
+                        }
+                    else:
+                        raise Exception(f"Unexpected response format: {result}")
+                else:
+                    raise Exception(f"HTTP {response.status}: {response.reason}")
+                    
+        except URLError as e:
+            logging.error(f"Feature service add failed (URLError): {str(e)}")
+            raise Exception(f"Network error: {str(e)}")
+        except Exception as e:
+            logging.error(f"Feature service add failed: {str(e)}")
+            raise
+    
+    def query_features(self, where_clause="1=1", return_fields="*", max_records=1000, order_by=None):
+        """Query features from the service"""
+        try:
+            url = f"{self.layer_url}/query"
+            
+            # Prepare query parameters
+            params = {
+                'where': where_clause,
+                'outFields': return_fields,
+                'resultRecordCount': max_records,
+                'returnGeometry': 'false',
+                'f': 'json'
+            }
+            
+            # Add ordering if specified
+            if order_by:
+                params['orderByFields'] = order_by
+            
+            # Get token and add to params
+            token = self.client.get_token()
+            params['token'] = token
+            
+            # Encode parameters for GET request
+            query_string = urllib.parse.urlencode(params)
+            full_url = f"{url}?{query_string}"
+            
+            # Create GET request
+            request = urllib.request.Request(
+                full_url,
+                headers={'User-Agent': 'Azure-Functions-ArcGIS-Client/1.0'}
+            )
+            
+            # Make the request
+            with urllib.request.urlopen(request, timeout=30) as response:
+                if response.status == 200:
+                    content = response.read()
+                    result = json.loads(content.decode('utf-8'))
+                    
+                    if 'error' in result:
+                        raise Exception(f"Query failed: {result['error']}")
+                    
+                    if 'features' in result:
+                        return {
+                            'success': True,
+                            'count': len(result['features']),
+                            'features': [f['attributes'] for f in result['features']]
+                        }
+                    else:
+                        raise Exception(f"Unexpected response format: {result}")
+                else:
+                    raise Exception(f"HTTP {response.status}: {response.reason}")
+                    
+        except URLError as e:
+            logging.error(f"Feature service query failed (URLError): {str(e)}")
+            raise Exception(f"Network error: {str(e)}")
+        except Exception as e:
+            logging.error(f"Feature service query failed: {str(e)}")
+            raise
+    
+    def _convert_to_arcgis_attributes(self, sensor_data):
+        """Convert sensor data to ArcGIS attributes format with field mapping"""
+        attributes = {}
+        
+        # Field mapping (sensor JSON field -> ArcGIS table field)
+        field_mappings = {
+            'location': 'location',
+            'node_id': 'node_id',
+            'block': 'block_id',           # Note: JSON has 'block', table has 'block_id'
+            'level': 'level',
+            'ward': 'ward',
+            'asset_type': 'asset_type',
+            'asset_id': 'asset_id',
+            'alarm_code': 'alarm_code',
+            'object_name': 'object_name',
+            'description': 'description',
+            'present_value': 'present_value',
+            'threshold_value': 'threshold_value',
+            'min_value': 'min_value',
+            'max_value': 'max_value',
+            'resolution': 'resolution',
+            'units': 'units',
+            'alarm_status': 'alarm_status',
+            'event_state': 'event_state',
+            'alarm_date': 'alarm_date',
+            'device_type': 'device_type'
+        }
+        
+        for json_field, arcgis_field in field_mappings.items():
+            if json_field in sensor_data:
+                value = sensor_data[json_field]
+                
+                # Handle date conversion (ISO string → ArcGIS timestamp in milliseconds)
+                if json_field == 'alarm_date' and isinstance(value, str):
+                    try:
+                        # Parse ISO string and convert to milliseconds since epoch
+                        dt = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                        value = int(dt.timestamp() * 1000)
+                    except ValueError as e:
+                        logging.warning(f"Invalid date format in alarm_date: {value}, error: {e}")
+                        # Use current time as fallback
+                        value = int(datetime.utcnow().timestamp() * 1000)
+                
+                attributes[arcgis_field] = value
+        
+        return attributes
+
+# Sensor Data Validation
+class SensorData:
+    """Sensor data validation and structure"""
+    
+    def __init__(self, data):
+        self.data = data
+        self._validate()
+    
+    def _validate(self):
+        """Validate required fields and data types"""
+        required_fields = {
+            'asset_id': str,
+            'present_value': (int, float),
+            'alarm_date': str,
+            'device_type': str
+        }
+        
+        # Check required fields
+        for field, expected_type in required_fields.items():
+            if field not in self.data:
+                raise ValueError(f"Missing required field: {field}")
+            
+            if not isinstance(self.data[field], expected_type):
+                raise ValueError(f"Field '{field}' must be of type {expected_type.__name__}")
+        
+        # Validate alarm_date format
+        try:
+            datetime.fromisoformat(self.data['alarm_date'].replace('Z', '+00:00'))
+        except ValueError:
+            raise ValueError(f"Field 'alarm_date' must be in ISO format (e.g., '2024-01-15T10:30:00.000Z')")
+    
+    def to_dict(self):
+        """Return validated data as dictionary"""
+        return self.data
+
+def validate_sensor_data(req_body):
+    """Validate sensor data from request body"""
+    if not req_body:
+        raise ValueError("Request body is empty")
+    
+    sensor_data = SensorData(req_body)
+    return sensor_data.to_dict()
+
+# Global REST client and feature service instances
 _rest_client = None
+_feature_service = None
 
 def get_rest_client():
     """Get or create ArcGIS REST client"""
@@ -149,6 +377,16 @@ def get_rest_client():
             password=os.environ.get('ARCGIS_PASSWORD', '')
         )
     return _rest_client
+
+def get_feature_service():
+    """Get or create ArcGIS Feature Service client"""
+    global _feature_service
+    if _feature_service is None:
+        rest_client = get_rest_client()
+        service_id = os.environ.get('FEATURE_SERVICE_ID', 'SensorDataService')
+        layer_index = int(os.environ.get('FEATURE_LAYER_INDEX', '0'))
+        _feature_service = ArcGISFeatureService(rest_client, service_id, layer_index)
+    return _feature_service
 
 app = func.FunctionApp()
 
@@ -399,6 +637,211 @@ def arcgis_test(req: func.HttpRequest) -> func.HttpResponse:
             json.dumps({
                 "status": "error", 
                 "error": str(e),
+                "timestamp": datetime.utcnow().isoformat()
+            }),
+            status_code=500,
+            mimetype="application/json"
+        )
+
+@app.route(route="sensor-data", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
+def sensor_data(req: func.HttpRequest) -> func.HttpResponse:
+    """Process sensor data and create historical records in ArcGIS"""
+    logging.info('Sensor data POST requested')
+    
+    try:
+        # Get request body
+        req_body = req.get_json()
+        if not req_body:
+            return func.HttpResponse(
+                json.dumps({
+                    "error": "Request body is required",
+                    "help": "Send JSON sensor data in request body",
+                    "timestamp": datetime.utcnow().isoformat()
+                }),
+                status_code=400,
+                mimetype="application/json"
+            )
+        
+        # Validate sensor data
+        try:
+            validated_data = validate_sensor_data(req_body)
+        except ValueError as e:
+            return func.HttpResponse(
+                json.dumps({
+                    "error": f"Validation failed: {str(e)}",
+                    "timestamp": datetime.utcnow().isoformat()
+                }),
+                status_code=400,
+                mimetype="application/json"
+            )
+        
+        # Check ArcGIS credentials
+        username = os.environ.get('ARCGIS_USERNAME', '')
+        password = os.environ.get('ARCGIS_PASSWORD', '')
+        
+        if not username or not password:
+            return func.HttpResponse(
+                json.dumps({
+                    "error": "ArcGIS credentials not configured",
+                    "help": "Configure ARCGIS_USERNAME and ARCGIS_PASSWORD environment variables",
+                    "timestamp": datetime.utcnow().isoformat()
+                }),
+                status_code=500,
+                mimetype="application/json"
+            )
+        
+        # Get feature service and add the historical record
+        feature_service = get_feature_service()
+        
+        # Add processing timestamp to track when record was received
+        processing_timestamp = datetime.utcnow().isoformat()
+        
+        # Add the feature (always creates new record - no updates)
+        result = feature_service.add_features([validated_data])
+        
+        if result['success'] and result['added_count'] > 0:
+            # Extract OBJECTID from successful result
+            arcgis_objectid = None
+            if result['results'] and len(result['results']) > 0:
+                first_result = result['results'][0]
+                if first_result.get('success'):
+                    arcgis_objectid = first_result.get('objectId')
+            
+            response_data = {
+                "status": "success",
+                "message": "Historical sensor data record created successfully",
+                "asset_id": validated_data.get('asset_id'),
+                "operation": "add",
+                "alarm_date": validated_data.get('alarm_date'),
+                "processed_timestamp": processing_timestamp,
+                "arcgis_objectid": arcgis_objectid,
+                "added_count": result['added_count'],
+                "failed_count": result['failed_count']
+            }
+            
+            logging.info(f"Sensor data added successfully: asset_id={validated_data.get('asset_id')}, objectid={arcgis_objectid}")
+            
+            return func.HttpResponse(
+                json.dumps(response_data),
+                status_code=200,
+                mimetype="application/json"
+            )
+        else:
+            # Handle case where add operation failed
+            error_details = []
+            if result.get('results'):
+                for res in result['results']:
+                    if not res.get('success') and res.get('error'):
+                        error_details.append(res['error'])
+            
+            error_msg = f"Failed to add sensor data: {'; '.join(error_details)}" if error_details else "Unknown error during add operation"
+            
+            return func.HttpResponse(
+                json.dumps({
+                    "error": error_msg,
+                    "asset_id": validated_data.get('asset_id'),
+                    "timestamp": processing_timestamp
+                }),
+                status_code=500,
+                mimetype="application/json"
+            )
+    
+    except Exception as e:
+        logging.error(f"Sensor data processing failed: {str(e)}")
+        return func.HttpResponse(
+            json.dumps({
+                "error": f"Internal server error: {str(e)}",
+                "timestamp": datetime.utcnow().isoformat()
+            }),
+            status_code=500,
+            mimetype="application/json"
+        )
+
+@app.route(route="features/{asset_id}", auth_level=func.AuthLevel.ANONYMOUS)
+def get_feature_by_asset_id(req: func.HttpRequest) -> func.HttpResponse:
+    """Get latest sensor reading for specific asset ID"""
+    logging.info('Get feature by asset ID requested')
+    
+    try:
+        asset_id = req.route_params.get('asset_id')
+        if not asset_id:
+            return func.HttpResponse(
+                json.dumps({
+                    "error": "Asset ID is required in URL path",
+                    "timestamp": datetime.utcnow().isoformat()
+                }),
+                status_code=400,
+                mimetype="application/json"
+            )
+        
+        # Check ArcGIS credentials
+        username = os.environ.get('ARCGIS_USERNAME', '')
+        password = os.environ.get('ARCGIS_PASSWORD', '')
+        
+        if not username or not password:
+            return func.HttpResponse(
+                json.dumps({
+                    "error": "ArcGIS credentials not configured",
+                    "timestamp": datetime.utcnow().isoformat()
+                }),
+                status_code=500,
+                mimetype="application/json"
+            )
+        
+        # Get feature service and query for the asset
+        feature_service = get_feature_service()
+        
+        # Query for this specific asset, ordered by alarm_date descending to get latest
+        result = feature_service.query_features(
+            where_clause=f"asset_id = '{asset_id}'",
+            return_fields="*",
+            max_records=1,
+            order_by="alarm_date DESC"
+        )
+        
+        if result['success']:
+            if result['count'] > 0:
+                latest_record = result['features'][0]
+                
+                response_data = {
+                    "found": True,
+                    "asset_id": asset_id,
+                    "latest_record": latest_record,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+                
+                return func.HttpResponse(
+                    json.dumps(response_data),
+                    status_code=200,
+                    mimetype="application/json"
+                )
+            else:
+                return func.HttpResponse(
+                    json.dumps({
+                        "found": False,
+                        "asset_id": asset_id,
+                        "message": "No records found for this asset ID",
+                        "timestamp": datetime.utcnow().isoformat()
+                    }),
+                    status_code=404,
+                    mimetype="application/json"
+                )
+        else:
+            return func.HttpResponse(
+                json.dumps({
+                    "error": "Feature query failed",
+                    "asset_id": asset_id,
+                    "timestamp": datetime.utcnow().isoformat()
+                }),
+                status_code=500,
+                mimetype="application/json"
+            )
+    
+    except Exception as e:
+        logging.error(f"Feature query failed: {str(e)}")
+        return func.HttpResponse(
+            json.dumps({
+                "error": f"Internal server error: {str(e)}",
                 "timestamp": datetime.utcnow().isoformat()
             }),
             status_code=500,
