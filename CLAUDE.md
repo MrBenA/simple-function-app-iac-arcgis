@@ -806,8 +806,8 @@ During initial deployment attempts, the function app was successfully deployed b
 ### Solution Implemented
 **Incremental Development Strategy**: Start with working minimal version, then add complexity step by step.
 
-#### Step 1: Minimal Working Version (CURRENT)
-- **Status**: ✅ **IMPLEMENTED** - Ready for deployment test
+#### Step 1: Minimal Working Version (COMPLETED)
+- **Status**: ✅ **WORKING** - Successfully deployed and tested
 - **Approach**: Simplified function_app.py based on successful `simple-function-app-iac` iteration
 - **Changes Made**:
   - Removed all complex imports (pydantic, arcgis, config)
@@ -815,13 +815,39 @@ During initial deployment attempts, the function app was successfully deployed b
   - Reduced timeout from 10 minutes to 5 minutes
   - Kept same infrastructure and deployment workflows
 
-#### Step 2: Incremental ArcGIS Integration (PLANNED)
-Once Step 1 is confirmed working:
-1. **Add basic ArcGIS import** - Test function registration with arcgis import
-2. **Add Pydantic validation** - Test with data validation
-3. **Add configuration management** - Test with environment variables
-4. **Add ArcGIS connectivity** - Test connection to ArcGIS Online
-5. **Add sensor data endpoints** - Full functionality
+#### Step 2: REST API Integration (PLANNED)
+**NEW APPROACH**: Use direct ArcGIS REST API instead of Python API to eliminate dependency complexity.
+
+**Strategy**: Based on analysis in `resources/arcgis_approaches_comparison.md`, implement lightweight REST API approach:
+
+**Phase 1: Basic REST Client**
+- Add `requests>=2.28.0` to requirements.txt
+- Test function registration still works
+- Add basic REST client structure
+
+**Phase 2: Authentication & Token Management**
+- Implement `ArcGISRestClient` class for token management
+- Add ArcGIS Online connectivity test in health endpoint
+- Test authentication without heavy dependencies
+
+**Phase 3: Feature Service Operations**
+- Implement `ArcGISFeatureService` class for CRUD operations
+- Add query, add, update, upsert methods via HTTP requests
+- Test basic feature operations
+
+**Phase 4: Sensor Data Processing**
+- Add `/api/sensor-data` POST endpoint with validation
+- Implement upsert logic (add/update based on asset_id)
+- Full sensor data ingestion functionality
+
+**Phase 5: Query Endpoints**
+- Add `/api/features/{asset_id}` and `/api/features` endpoints
+- Complete ArcGIS integration without Python API complexity
+
+**Performance Benefits**: 
+- Deployment: 30+ min → 2-3 min
+- Cold Start: 10-15 sec → 1-2 sec  
+- Dependencies: 50+ packages → 2 packages
 
 ### Key Lessons Learned
 1. **Function Registration Failure**: Heavy dependencies can prevent function discovery
@@ -880,11 +906,29 @@ This proves the system dependency solution worked for compilation, but the funct
 4. **USE WORKING BASELINE**: Compare with successful simple-function-app-iac iteration
 5. **DOCUMENT FAILURES**: Record what breaks function registration
 
+**Test Results (2025-07-18)**:
+- ✅ Health endpoint: Returns JSON with status "healthy" and version "1.0.0-arcgis-minimal"
+- ✅ Test endpoint: Returns success message
+- ✅ Hello endpoint: Responds to parameters correctly  
+- ✅ Function registration: All 3 functions properly registered in Azure Functions
+- ✅ HTTP 200 responses on all endpoints (vs previous 404 errors)
+
 **Current Next Steps**:
 1. ✅ Implement minimal working version (COMPLETED)
-2. 🔄 Test deployment of minimal version (IN PROGRESS)
-3. 📋 Verify all endpoints return 200 responses
-4. 📋 Add ArcGIS Python API incrementally
-5. 📋 Test function registration after each addition
+2. ✅ Test deployment of minimal version (COMPLETED)
+3. ✅ Verify all endpoints return 200 responses (COMPLETED)
+4. 🔄 **NEW APPROACH**: Implement REST API integration (READY TO START)
+5. 📋 Phase 1: Add requests library and test function registration
+6. 📋 Phase 2: Implement authentication and token management  
+7. 📋 Phase 3: Add feature service operations via REST API
+8. 📋 Phase 4: Add sensor data processing endpoint
+9. 📋 Phase 5: Add query endpoints for complete functionality
+
+**Approach Change Rationale**: 
+- **Eliminates dependency complexity** that caused function registration failures
+- **Maintains same ArcGIS functionality** via REST API calls
+- **Massive performance improvements** (2-3 min deployments vs 30+ min)
+- **Higher reliability** - no system dependency compilation issues
+- **Same feature set** - token auth, CRUD operations, queries, upserts
 
 **Target Architecture**: Once working, this will demonstrate practical ArcGIS integration with Azure Functions, providing a foundation for sensor data processing and storage in geospatial platforms.
