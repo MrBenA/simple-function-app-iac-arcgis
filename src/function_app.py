@@ -37,15 +37,15 @@ class ArcGISRestClient:
             return self.token
         
         try:
-            # Prepare token request
+            # Prepare token request (fixed based on ArcGIS documentation)
             token_url = f"{self.org_url}/sharing/rest/generateToken"
             data = {
                 'username': self.username,
                 'password': self.password,
-                'client': 'requestip',
+                'client': 'referer',  # FIX: Changed from 'requestip' to 'referer' per ArcGIS docs
+                'referer': 'https://www.arcgis.com',  # Required when client=referer
                 'f': 'json',
-                'expiration': 60,  # 60 minutes
-                'referer': 'https://www.arcgis.com'  # Add referer for feature service operations
+                'expiration': 60  # 60 minutes
             }
             
             # Encode data for POST request
@@ -136,6 +136,7 @@ class ArcGISRestClient:
                 'success': False, 
                 'error': str(e)
             }
+    
 
 class ArcGISFeatureService:
     """ArcGIS Feature Service operations for historical sensor data"""
@@ -213,14 +214,16 @@ class ArcGISFeatureService:
                 'rollbackOnFailure': 'true'
             }
             
-            # Get token and add to data
+            # Get standard token and add to data
             token = self.client.get_token()
             data['token'] = token
             data['f'] = 'json'
             
             # Debug logging
-            logging.info(f"Using token for feature service operation: {token[:20]}...")
+            logging.info(f"Using token for feature service operation: {token[:20] if token else 'None'}...")
             logging.info(f"Feature service URL: {url}")
+            logging.info(f"Service URL: {self.service_url}")
+            logging.info(f"Service ID: {self.service_id}")
             
             # Encode data for POST request
             data_encoded = urllib.parse.urlencode(data).encode('utf-8')
@@ -286,7 +289,7 @@ class ArcGISFeatureService:
             if order_by:
                 params['orderByFields'] = order_by
             
-            # Get token and add to params
+            # Get standard token and add to params
             token = self.client.get_token()
             params['token'] = token
             
