@@ -10,8 +10,8 @@ import urllib.parse
 from datetime import datetime
 
 # Test endpoint URLs
-BASE_URL = "http://localhost:7071/api"  # Local testing
-# BASE_URL = "https://simple-func-iac-arcgis-ba.azurewebsites.net/api"  # Production
+# BASE_URL = "http://localhost:7071/api"  # Local testing
+BASE_URL = "https://simple-func-iac-arcgis-ba.azurewebsites.net/api"  # Production
 
 # Test data - minimal required fields
 minimal_sensor_data = {

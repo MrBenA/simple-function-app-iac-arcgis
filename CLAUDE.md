@@ -9,11 +9,11 @@ Create a simpler function app that can receive REST API POST requests containing
 
 ### Hosted Table Details (from resources/create-hosted-table.ipynb)
 - **Service Name**: "SensorDataService"
-- **Service ID**: `859582e956e4443c9ebc9c3d84e58d37`
+- **Service ID**: `f4682a40e60847fe8289408e73933b82`
 - **Table Name**: "SensorReadings"
 - **Service URL**: `https://services-eu1.arcgis.com/veDTgAL7B9EBogdG/arcgis/rest/services/SensorDataService/FeatureServer`
 - **Table Index**: 0 (first table in the service)
-- **Current Status**: Empty table ready for sensor data
+- **Current Status**: Ready for historical sensor data ingestion
 
 ### Sensor Data Format
 ```json

@@ -188,3 +188,4 @@ azure-pipelines.yml
 !host.json
 !requirements.txt
 resources/function-app-deploy-log.txt
+test_sensor_data.py

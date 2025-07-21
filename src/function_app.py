@@ -143,8 +143,10 @@ class ArcGISFeatureService:
         self.client = rest_client
         self.service_id = service_id
         self.layer_index = layer_index
-        # Updated URL structure for hosted services
-        self.service_url = f"https://services-eu1.arcgis.com/veDTgAL7B9EBogdG/arcgis/rest/services/{service_id}/FeatureServer"
+        # For hosted services, URL uses service name, not service ID
+        # The service name is typically the same as specified when created
+        service_name = "SensorDataService"  # Service name from hosted table creation
+        self.service_url = f"https://services-eu1.arcgis.com/veDTgAL7B9EBogdG/arcgis/rest/services/{service_name}/FeatureServer"
         self.layer_url = f"{self.service_url}/{layer_index}"
     
     def add_features(self, features):
@@ -383,7 +385,7 @@ def get_feature_service():
     global _feature_service
     if _feature_service is None:
         rest_client = get_rest_client()
-        service_id = os.environ.get('FEATURE_SERVICE_ID', 'SensorDataService')
+        service_id = os.environ.get('FEATURE_SERVICE_ID', 'f4682a40e60847fe8289408e73933b82')
         layer_index = int(os.environ.get('FEATURE_LAYER_INDEX', '0'))
         _feature_service = ArcGISFeatureService(rest_client, service_id, layer_index)
     return _feature_service
