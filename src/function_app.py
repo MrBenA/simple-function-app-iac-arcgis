@@ -142,14 +142,31 @@ class ArcGISFeatureService:
     """ArcGIS Feature Service operations for historical sensor data"""
     
     def __init__(self, rest_client, service_id, layer_index=0):
+        # Validate inputs to prevent None/undefined URLs
+        if not rest_client:
+            raise ValueError("rest_client cannot be None")
+        if not service_id:
+            raise ValueError("service_id cannot be None or empty")
+            
         self.client = rest_client
         self.service_id = service_id
         self.layer_index = layer_index
+        
         # Use direct service URL construction (proven working approach)
         service_name = "SensorDataService"
+        if not service_name:
+            raise ValueError("service_name cannot be None or empty")
+            
         self.service_url = f"https://services-eu1.arcgis.com/veDTgAL7B9EBogdG/arcgis/rest/services/{service_name}/FeatureServer"
         self.layer_url = f"{self.service_url}/{self.layer_index}"
-        logging.info(f"Using service URL: {self.service_url}")
+        
+        # Validate final URLs
+        if not self.service_url or self.service_url == "None" or "/None/" in self.service_url:
+            raise ValueError(f"Invalid service_url constructed: {self.service_url}")
+        if not self.layer_url or self.layer_url == "None" or "/None/" in self.layer_url:
+            raise ValueError(f"Invalid layer_url constructed: {self.layer_url}")
+            
+        logging.info(f"ArcGISFeatureService initialized - Service URL: {self.service_url}")
     
     def add_features(self, features):
         """Add new historical features to the service"""
@@ -391,30 +408,20 @@ def validate_sensor_data(req_body):
     sensor_data = SensorData(req_body)
     return sensor_data.to_dict()
 
-# Global REST client and feature service instances
-_rest_client = None
-_feature_service = None
-
 def get_rest_client():
-    """Get or create ArcGIS REST client"""
-    global _rest_client
-    if _rest_client is None:
-        _rest_client = ArcGISRestClient(
-            org_url=os.environ.get('ARCGIS_URL', 'https://www.arcgis.com'),
-            username=os.environ.get('ARCGIS_USERNAME', ''),
-            password=os.environ.get('ARCGIS_PASSWORD', '')
-        )
-    return _rest_client
+    """Create ArcGIS REST client (no caching for cold start reliability)"""
+    return ArcGISRestClient(
+        org_url=os.environ.get('ARCGIS_URL', 'https://www.arcgis.com'),
+        username=os.environ.get('ARCGIS_USERNAME', ''),
+        password=os.environ.get('ARCGIS_PASSWORD', '')
+    )
 
 def get_feature_service():
-    """Get or create ArcGIS Feature Service client"""
-    global _feature_service
-    if _feature_service is None:
-        rest_client = get_rest_client()
-        service_id = os.environ.get('FEATURE_SERVICE_ID', 'f4682a40e60847fe8289408e73933b82')
-        layer_index = int(os.environ.get('FEATURE_LAYER_INDEX', '0'))
-        _feature_service = ArcGISFeatureService(rest_client, service_id, layer_index)
-    return _feature_service
+    """Create ArcGIS Feature Service client (no caching for cold start reliability)"""
+    rest_client = get_rest_client()
+    service_id = os.environ.get('FEATURE_SERVICE_ID', 'f4682a40e60847fe8289408e73933b82')
+    layer_index = int(os.environ.get('FEATURE_LAYER_INDEX', '0'))
+    return ArcGISFeatureService(rest_client, service_id, layer_index)
 
 app = func.FunctionApp()
 
