@@ -792,6 +792,98 @@ def sensor_data(req: func.HttpRequest) -> func.HttpResponse:
             mimetype="application/json"
         )
 
+@app.route(route="features", auth_level=func.AuthLevel.ANONYMOUS)
+def list_features(req: func.HttpRequest) -> func.HttpResponse:
+    """List latest sensor records with optional filtering"""
+    logging.info('List features requested')
+    
+    try:
+        # Get query parameters with defaults
+        limit = int(req.params.get('limit', '10'))
+        where_clause = req.params.get('where', '1=1')
+        order_by = req.params.get('order_by', 'alarm_date DESC')
+        
+        # Validate limit parameter
+        if limit < 1 or limit > 1000:
+            return func.HttpResponse(
+                json.dumps({
+                    "error": "Limit must be between 1 and 1000",
+                    "timestamp": datetime.utcnow().isoformat()
+                }),
+                status_code=400,
+                mimetype="application/json"
+            )
+        
+        # Check ArcGIS credentials
+        username = os.environ.get('ARCGIS_USERNAME', '')
+        password = os.environ.get('ARCGIS_PASSWORD', '')
+        
+        if not username or not password:
+            return func.HttpResponse(
+                json.dumps({
+                    "error": "ArcGIS credentials not configured",
+                    "timestamp": datetime.utcnow().isoformat()
+                }),
+                status_code=500,
+                mimetype="application/json"
+            )
+        
+        # Get feature service and query records
+        feature_service = get_feature_service()
+        
+        result = feature_service.query_features(
+            where_clause=where_clause,
+            return_fields="*",
+            max_records=limit,
+            order_by=order_by
+        )
+        
+        if result['success']:
+            response_data = {
+                "success": True,
+                "count": result['count'],
+                "limit": limit,
+                "where_clause": where_clause,
+                "order_by": order_by,
+                "features": result['features'],
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+            return func.HttpResponse(
+                json.dumps(response_data),
+                status_code=200,
+                mimetype="application/json"
+            )
+        else:
+            return func.HttpResponse(
+                json.dumps({
+                    "error": "Feature query failed",
+                    "timestamp": datetime.utcnow().isoformat()
+                }),
+                status_code=500,
+                mimetype="application/json"
+            )
+    
+    except ValueError as e:
+        return func.HttpResponse(
+            json.dumps({
+                "error": f"Invalid parameter: {str(e)}",
+                "timestamp": datetime.utcnow().isoformat()
+            }),
+            status_code=400,
+            mimetype="application/json"
+        )
+    except Exception as e:
+        logging.error(f"List features failed: {str(e)}")
+        return func.HttpResponse(
+            json.dumps({
+                "error": f"Internal server error: {str(e)}",
+                "timestamp": datetime.utcnow().isoformat()
+            }),
+            status_code=500,
+            mimetype="application/json"
+        )
+
 @app.route(route="features/{asset_id}", auth_level=func.AuthLevel.ANONYMOUS)
 def get_feature_by_asset_id(req: func.HttpRequest) -> func.HttpResponse:
     """Get latest sensor reading for specific asset ID"""
