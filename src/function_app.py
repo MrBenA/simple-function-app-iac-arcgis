@@ -1,7 +1,17 @@
 import azure.functions as func
 import logging
 import json
+import os
 from datetime import datetime
+
+# Test requests import
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+    logging.info("Requests library imported successfully")
+except ImportError as e:
+    REQUESTS_AVAILABLE = False
+    logging.error(f"Requests import failed: {e}")
 
 app = func.FunctionApp()
 
@@ -13,7 +23,9 @@ def health(req: func.HttpRequest) -> func.HttpResponse:
     health_data = {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "1.0.0-minimal-restored"
+        "version": "2.0.0-python-3.11-requests",
+        "python_version": "3.11",
+        "requests_available": REQUESTS_AVAILABLE
     }
     
     return func.HttpResponse(
@@ -55,3 +67,52 @@ def hello(req: func.HttpRequest) -> func.HttpResponse:
         response_text,
         status_code=200
     )
+
+@app.route(route="requests-test", auth_level=func.AuthLevel.ANONYMOUS)
+def requests_test(req: func.HttpRequest) -> func.HttpResponse:
+    """Test requests library with simple HTTP call"""
+    logging.info('Requests test requested')
+    
+    if not REQUESTS_AVAILABLE:
+        return func.HttpResponse(
+            json.dumps({
+                "error": "Requests library not available",
+                "timestamp": datetime.utcnow().isoformat()
+            }),
+            status_code=500,
+            mimetype="application/json"
+        )
+    
+    try:
+        # Simple HTTP test to a reliable endpoint
+        response = requests.get('https://httpbin.org/json', timeout=10)
+        response.raise_for_status()
+        
+        test_data = response.json()
+        
+        return func.HttpResponse(
+            json.dumps({
+                "status": "success",
+                "message": "Requests library working perfectly",
+                "test_url": "https://httpbin.org/json",
+                "response_status": response.status_code,
+                "response_data": test_data,
+                "python_version": "3.11",
+                "requests_version": getattr(requests, '__version__', 'unknown'),
+                "timestamp": datetime.utcnow().isoformat()
+            }),
+            status_code=200,
+            mimetype="application/json"
+        )
+    
+    except Exception as e:
+        logging.error(f"Requests test failed: {str(e)}")
+        return func.HttpResponse(
+            json.dumps({
+                "status": "failed",
+                "error": str(e),
+                "timestamp": datetime.utcnow().isoformat()
+            }),
+            status_code=500,
+            mimetype="application/json"
+        )
