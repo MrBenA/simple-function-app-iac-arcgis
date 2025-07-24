@@ -363,7 +363,7 @@ class SensorData:
             'location': str,
             'node_id': str,
             'block': str,
-            'level': int,
+            'level_code': int,
             'ward': str,
             'asset_type': str,
             'asset_id': str,
