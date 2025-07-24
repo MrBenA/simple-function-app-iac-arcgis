@@ -190,3 +190,4 @@ azure-pipelines.yml
 resources/function-app-deploy-log.txt
 test_sensor_data.py
 resources/testPage.html
+resources/create-hosted-table.ipynb

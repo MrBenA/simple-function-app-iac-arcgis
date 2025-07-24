@@ -153,7 +153,7 @@ class ArcGISFeatureService:
         self.layer_index = layer_index
         
         # Use direct service URL construction (proven working approach)
-        service_name = "SensorDataService"
+        service_name = "SensorDataService" # As is set by the AGOL 'create-hosted-table' Notebook. Consider making this dynamic.
         if not service_name:
             raise ValueError("service_name cannot be None or empty")
             
@@ -311,7 +311,7 @@ class ArcGISFeatureService:
             'location': 'location',
             'node_id': 'node_id',
             'block': 'block_id',           # Note: JSON has 'block', table has 'block_id'
-            'level': 'level',
+            'level': 'level_code',       # Note: JSON has 'level', table has 'level_code'
             'ward': 'ward',
             'asset_type': 'asset_type',
             'asset_id': 'asset_id',
